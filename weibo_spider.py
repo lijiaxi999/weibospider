@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import os
 import math
 import re
@@ -94,15 +96,12 @@ class Weibo:
         if self.count % 2 == 0:
             sleep(np.random.randint(1, 2))
             # print("have a nap.")
-        if self.count % 11 == 0:
-            sleep(np.random.randint(10, 15))
+        #if self.count % 11 == 0:
+         #   sleep(np.random.randint(10, 15))
             # print("have a sleep.")
         if self.count % 250 == 0:
+            print("sleep 300.")
             sleep(300)
-            print("sleep 200.")
-        if self.count % 450 == 0:
-            sleep(300)
-            print("sleep 400")
 
     # 包装requests包的get函数
     # 每调用一次便打印url，同时计数加一
@@ -269,7 +268,7 @@ class Weibo:
                 url = "https://weibo.cn" + href
                 selector = self.get(url)
                 # 可能用户被删除，直接忽略
-                if selector is not None:
+                if selector is None:
                     continue
                 try:
                     href = selector.xpath("//div[@class='u']//a[1]/@href")[0]
@@ -374,10 +373,11 @@ class Weibo:
                     for i in range(0, len(info) - 2):
                         # 首先判断转发还是原创 True标志为转发，否则为原创
                         flag = '!!!'
-                        temp = info[i].xpath("div[1]/span[1]")[0]
+                        temp = info[i].xpath("div[1]/span")[0]
                         att = temp.attrib['class']
                         if att == 'kt':
-                            temp = info[i].xpath("div[1]/span[2]/@class")[0]
+                            temp = info[i].xpath("div[1]/span")[1]
+                            att = temp.attrib['class']
                         if att == 'cmt':
                             a_node = temp.xpath("a")
                             if len(a_node) > 0:
@@ -852,8 +852,8 @@ class Weibo:
 
             self.get_username()
             self.get_user_info()
-            self.get_followers_info()
-            self.get_followings_info()
+            # self.get_followers_info()
+            # self.get_followings_info()
             self.get_weibo()
             # self.write_txt()
             self.write_db()
@@ -873,7 +873,7 @@ class Weibo:
 def main():
     try:
         # 使用实例,输入一个用户id，所有信息都会存储在wb实例中
-        user_id = 1826792401  # 可以改成任意合法的用户id（爬虫的微博id除外）
+        user_id = 1749127163  # 可以改成任意合法的用户id（爬虫的微博id除外）
         filter = 0  # 值为0表示爬取全部微博（原创微博+转发微博），值为1表示只爬取原创微博
         wb = Weibo(user_id, filter)  # 调用Weibo类，创建微博实例wb
         wb.start()  # 爬取微博信息
