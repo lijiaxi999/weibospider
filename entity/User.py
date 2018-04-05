@@ -4,7 +4,6 @@
 
 __author__ = 'lijiaxi999'
 
-
 class User(object):
     # some constants
     RED_V, BLUE_V, VIP, ACTIVE = '红V', '蓝V', 'VIP', '达人'
