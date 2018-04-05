@@ -671,7 +671,7 @@ class Weibo:
             file_dir = os.path.split(os.path.realpath(__file__))[0] + os.sep + "weibo"
             if not os.path.isdir(file_dir):
                 os.mkdir(file_dir)
-            file_path = file_dir + os.sep + "%s" % self.username + ".txt"
+            file_path = file_dir + os.sep + "%s" % self.username + ".json"
             f = open(file_path, "wb")
 
             if self.filters:
@@ -854,7 +854,7 @@ class Weibo:
             self.get_user_info()
             # self.get_followers_info()
             # self.get_followings_info()
-            self.get_weibo()
+            #self.get_weibo()
             # self.write_txt()
             self.write_db()
             self.show()
