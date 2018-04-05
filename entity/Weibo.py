@@ -6,7 +6,6 @@ __author__ = 'lijiaxi999'
 
 from enum import Enum, unique
 
-
 # 枚举类型
 @unique
 class Weibo_type(Enum):
