@@ -253,10 +253,19 @@ class Spider(object):
         info = {}
 
         # 获取博主头像
-        # img_node = soup.xpath("//div[@class='u']/table//img[@alt='头像']")[0]
-        # img_url = img_node.attrib['src']
-        # img = self.__get(img_url).content
-        # info['img'] = img
+        img_node = soup.xpath("//div[@class='u']/table//img[@alt='头像']")[0]
+        img_url = img_node.attrib['src']
+        img = self.__get(img_url).content
+        # 记录当前博主的name
+        name = soup.xpath("string(//head/title)")[:-3]
+        # 将其保存在 pic 文件夹
+        file_dir = os.path.split(os.path.realpath(__file__))[0] + os.sep + "pic"
+        if not os.path.isdir(file_dir):
+            os.mkdir(file_dir)
+        file_path = file_dir + os.sep + "%s" % name + ".jpg"
+        with open(file_path, 'wb') as f:
+            f.write(img)
+        info['img'] = file_path
 
         # 获取博主微博数
         str_wb = soup.xpath("//div[@class='tip2']/span[@class='tc']/text()")[0]
@@ -632,10 +641,6 @@ class Spider(object):
 
     @catch_exception
     def write_json(self, blogger):
-
-        j = json.dumps(blogger, default=lambda obj: obj.__dict__, ensure_ascii=False)
-        print(j)
-
         file_dir = os.path.split(os.path.realpath(__file__))[0] + os.sep + "weibo"
         if not os.path.isdir(file_dir):
             os.mkdir(file_dir)
