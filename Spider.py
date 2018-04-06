@@ -419,6 +419,7 @@ class Spider(object):
     def get_fans_info(self, blogger, num):
         uid = blogger.data['id']
         fans_num = blogger.data['fans_num']
+
         if fans_num < 3000:
             url = "https://weibo.cn/%d/fans" % uid
             html = self.__get(url).content
@@ -450,8 +451,8 @@ class Spider(object):
                         continue
                     blogger.fans.append(fan)
                     count += 1
-                    if count >= num:
-                        break
+                if count >= num:
+                    break
         # 从用户的微博中抓取 num个点赞的人数
         else:
             # 在这种情况下，抽取的点赞用户可能会重复，所以需要一个list来记录，以便查询
@@ -497,6 +498,42 @@ class Spider(object):
                 # 仅一条微博就爬取100 fan
                 if page < page_num:
                     break
+
+    # 获取关注者信息
+    def get_followers_info(self, blogger, num):
+        uid = blogger.data['id']
+        count = 0
+
+        url = "https://weibo.cn/%d/follow?page=1" % uid
+        html = self.__get(url).content
+        soup = etree.HTML(html)
+        temp = soup.xpath("//div[@id='pagelist']//div/input[@name='mp']")[0]
+        page_num = int(temp.attrib['value'])
+
+        # 开始遍历前n页
+        for i in range(1, page_num + 1):
+            if i != 1:
+                url = "https://weibo.cn/%d/follow?page=%d" % (uid, i)
+                html = self.__get(url).content
+                soup = etree.HTML(html)
+            temp = soup.xpath("//table")
+            # 遍历每一页的每一个粉丝节点
+            for tr_node in temp:
+                node = tr_node.xpath(".//a")[0]
+                href = node.attrib['href']
+                # 获取该用户的str_id
+                str_id = href[17:]
+                follower = User(str_id)
+                # 注意有可能爬取到自己！！！ 因为页面不同，会出现Indexerror
+                try:
+                    self.get_user_info(follower)
+                except IndexError:
+                    continue
+                blogger.followers.append(follower)
+                count += 1
+
+            if count >= num:
+                break
 
     # 返回一个记录了信息的User对象
     # 获取用户信息
@@ -618,16 +655,17 @@ class Spider(object):
         if num_fans < 0:
             num_fans = INF
         else:
-            max_num_fans = num_fans
+            num_fans = num_fans
         if num_followers < 0:
-            num_follow = INF
+            num_followers = INF
         else:
-            num_follow = num_followers
+            num_followers = num_followers
         # 开始运行
         if isinstance(blogger, Blogger):
             self.get_user_info(blogger)
             self.get_weibo_info(blogger, num_weibo)
             self.get_fans_info(blogger, num_fans)
+            self.get_followers_info(blogger, num_followers)
             # self.show(blogger)
             self.write_json(blogger)
         else:
@@ -638,10 +676,10 @@ class Spider(object):
 def main():
     try:
         # 使用实例,输入一个用户id，所有信息都会存储在Blogger实例中
-        uid = 'zeattere'  # 可以改成任意合法的用户id（爬虫的微博id除外）
+        uid = 'yeziyiyeziyi'  # 可以改成任意合法的用户id（爬虫的微博id除外）
         blogger = Blogger(uid)
         spider = Spider()
-        spider.start(blogger, num_weibo=-1, num_fans=100, num_followers=100)
+        spider.start(blogger, num_weibo=10, num_fans=10, num_followers=10)
     except Exception as e:
         traceback.print_exc()
 
