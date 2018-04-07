@@ -54,9 +54,10 @@ class Spider(object):
     pattern1 = r'\[(\d+)\]'  # 用于抽取中括号中的数字
     pattern2 = r'\/(\d+)\/'  # 用于抽取两个顺斜杠/间的数字
 
-    def __init__(self):
+    def __init__(self, cookie):
         # 记录该spider已经发起了几次requests访问
         self.count = 0
+        self.headers['Cookie'] = cookie
 
     # 持续爬取会被禁止访问，request会返回403
     # 解决方法引入sleep, 每访问2页，sleep 1.5秒。
@@ -366,13 +367,14 @@ class Spider(object):
         # 判断是否是长微博,是的话获取全文
         a_link = node.xpath("div/span[@class='ctt']/a/@href")
         content = ''
-        if a_link:
-            if a_link[-1].startswith("/comment/"):
-                a_url = "https://weibo.cn" + a_link[-1]
-                content = self.__parse_long_weibo(a_url)
+        if a_link and a_link[-1].startswith("/comment/"):
+            # 添加type信息，长微博
+            a_url = "https://weibo.cn" + a_link[-1]
+            content = self.__parse_long_weibo(a_url)
         # 否则正常获取
         else:
-            temp = node.xpath("div[1]/span[@class='ctt'][1]")[0]
+            # 添加type信息，短微博
+            temp = node.xpath("div[1]/span[@class='ctt']")[0]
             content = temp.xpath("string(.)")
             content = content[:-4]  # 注意微博信息后会有一个空格和三个无宽度字符
         info['content'] = content
@@ -418,6 +420,28 @@ class Spider(object):
         guid = re.findall(self.pattern1, comment, re.M)
         comment_num = int(guid[0])
         info['comment_num'] = comment_num
+
+        # 7.获取微博类型。
+        info['type'] = []
+        a_link = node.xpath("div/span[@class='ctt']/a/@href")
+        if a_link and a_link[-1].startswith("/comment/"):
+            info['type'].append(Weibo.lxt)  # 添加type信息，长微博
+        else:
+            info['type'].append(Weibo.txt)  # 添加type信息，短微博
+
+        img_nodes = node.xpath(".//img")  # 添加type信息，图片
+        if len(img_nodes) > 0:
+            info['type'].append(Weibo.pic)
+
+        if info['content'].startswith('发布了头条文章：'):
+            info['type'].append(Weibo.ari)  # 添加type信息，头条文章
+            info['type'].remove(Weibo.txt)
+
+        a_nodes = node.xpath(".//a/text()")
+        for n in a_nodes:
+            if n.endswith("的秒拍视频"):
+                info['type'].append(Weibo.vio)
+                break
 
         # 返回一个weibo实例
         weibo = Weibo(flag)
@@ -650,7 +674,7 @@ class Spider(object):
             f.write(json.dumps(blogger, default=lambda obj: obj.__dict__, ensure_ascii=False))
 
     @catch_exception
-    def start(self, blogger, num_weibo=10, num_fans=10, num_followers=10):
+    def start(self, uid, num_weibo=10, num_fans=10, num_followers=10):
         # 处理一下要爬取的数量
         INF = 10 ** 9
         if num_weibo < 0:
@@ -666,25 +690,25 @@ class Spider(object):
         else:
             num_followers = num_followers
         # 开始运行
-        if isinstance(blogger, Blogger):
-            self.get_user_info(blogger)
-            self.get_weibo_info(blogger, num_weibo)
-            self.get_fans_info(blogger, num_fans)
-            self.get_followers_info(blogger, num_followers)
-            # self.show(blogger)
-            self.write_json(blogger)
-        else:
-            print("We need a blogger to begin!")
-            exit(1)
+        blogger = Blogger(uid)
+        self.get_user_info(blogger)
+        self.get_weibo_info(blogger, num_weibo)
+        self.get_fans_info(blogger, num_fans)
+        self.get_followers_info(blogger, num_followers)
+        # self.show(blogger)
+        self.write_json(blogger)
 
 
 def main():
     try:
         # 使用实例,输入一个用户id，所有信息都会存储在Blogger实例中
         uid = 'yeziyiyeziyi'  # 可以改成任意合法的用户id（爬虫的微博id除外）
-        blogger = Blogger(uid)
-        spider = Spider()
-        spider.start(blogger, num_weibo=10, num_fans=10, num_followers=10)
+        spider = Spider(
+            cookie="SCF=AmKlvBa_-31Qcim1a-VJVUbGdM63PpiPb0hwfg7XvHVnPuamm8ZncnV_4Jz_l1R33xq8JhnX6M8DDGQoRli93Co.; "
+                   "_T_WM=9be2c805b11b9dc344fe89ca703185db; "
+                   "SUB=_2A253vjYLDeRhGeNN61YR9ybFyDqIHXVVQVpDrDV6PUJbkdBeLRP-kW1NSfYZnVCaBMKM_BcPc-hHZ7qfp21n77MX; "
+                   "SUHB=0wn1hm2fI0IYGh; SSOLoginState=1522157147")
+        spider.start(uid, num_weibo=10, num_fans=10, num_followers=10)
     except Exception as e:
         traceback.print_exc()
 
