@@ -4,21 +4,17 @@
 
 __author__ = 'lijiaxi999'
 
-from enum import Enum, unique
 
-# 枚举类型
-@unique
-class Weibo_type(Enum):
+class Weibo(object):
+    # some constants
     txt = '短微博'
     lxt = '长微博'
     pic = '图片'
-    vio = '视频'
-    ari = '文章'
+    vio = '短视频'
+    ari = '头条文章'
 
-
-class Weibo(object):
     # 初始化实例属性
-    def __init__(self,flag):
+    def __init__(self, flag):
         self.flag = flag
         self.data = {
             'content': '',
@@ -35,5 +31,3 @@ class Weibo(object):
 
     def wirte(self, info):
         self.data.update(info)
-
-
