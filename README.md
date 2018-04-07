@@ -6,13 +6,19 @@
 >爬取一名用户在新浪微博上的全部信息，包括用户个人信息，发布的微博，用户关注者，用户粉丝。
 
 ## 输入
-1.需要用户手动获取登陆新浪微博的cookies
+1.需要用户手动获取登陆新浪微博的cookies 
+>[模拟登录新浪微博（直接填入Cookie）](https://www.douban.com/note/264976536/?start=0#32893498)
 
 2.想要爬取用户的id
+>字符id ![字符id](./screen_shot/字符id.PNG)
 
+>数字id ![数字id](./screen_shot/数字id.PNG)
+两种皆可
 ## 输出
-以爬取的用户昵称命名的json文件。
-
+以爬取的用户昵称命名的json文件。示例如下：
+>![json1](./screen_shot/json1.PNG)
+>![json2](./screen_shot/json2.PNG)
+>![json3](./screen_shot/json3.PNG)
 ## 数据段
 >**User的数据段，希望爬取的博主，及其关注者和粉丝**
 
@@ -44,7 +50,7 @@
 | followers | list | 博主关注的人 |
 | fans | list |博主的粉丝|  
 
- >** Weibo数据段，博主发布的微博**
+ >**Weibo数据段，博主发布的微博**
  
 | 段域 | 数据类型 | 含义 |
 |------|-------|------|
