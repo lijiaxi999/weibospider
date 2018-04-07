@@ -44,10 +44,7 @@ class Spider(object):
         'Accept-Encoding': 'gzip, deflate, sdch',
         'Accept-Language': 'zh-CN,zh;q=0.8,en;q=0.6,pl;q=0.4,zh-TW;q=0.2,ru;q=0.2',
         'Connection': 'keep-alive',
-        'Cookie': "SCF=AmKlvBa_-31Qcim1a-VJVUbGdM63PpiPb0hwfg7XvHVnPuamm8ZncnV_4Jz_l1R33xq8JhnX6M8DDGQoRli93Co.; "
-                  "_T_WM=9be2c805b11b9dc344fe89ca703185db; "
-                  "SUB=_2A253vjYLDeRhGeNN61YR9ybFyDqIHXVVQVpDrDV6PUJbkdBeLRP-kW1NSfYZnVCaBMKM_BcPc-hHZ7qfp21n77MX; "
-                  "SUHB=0wn1hm2fI0IYGh; SSOLoginState=1522157147",
+        'Cookie': "",
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.132 Safari/537.36'
     }
 
@@ -704,10 +701,7 @@ def main():
         # 使用实例,输入一个用户id，所有信息都会存储在Blogger实例中
         uid = 'yeziyiyeziyi'  # 可以改成任意合法的用户id（爬虫的微博id除外）
         spider = Spider(
-            cookie="SCF=AmKlvBa_-31Qcim1a-VJVUbGdM63PpiPb0hwfg7XvHVnPuamm8ZncnV_4Jz_l1R33xq8JhnX6M8DDGQoRli93Co.; "
-                   "_T_WM=9be2c805b11b9dc344fe89ca703185db; "
-                   "SUB=_2A253vjYLDeRhGeNN61YR9ybFyDqIHXVVQVpDrDV6PUJbkdBeLRP-kW1NSfYZnVCaBMKM_BcPc-hHZ7qfp21n77MX; "
-                   "SUHB=0wn1hm2fI0IYGh; SSOLoginState=1522157147")
+            cookie="")
         spider.start(uid, num_weibo=10, num_fans=10, num_followers=10)
     except Exception as e:
         traceback.print_exc()
