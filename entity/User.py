@@ -35,11 +35,11 @@ class Blogger(User):
         super().__init__(str_id)
         self.extra_data = {  # 作为爬取对象的博主需要获取额外的信息
             'img': '',
-            'wb_num': -1,  # 记录博主曾发微博的总数，但可能由于某些原因不能够全部获取
-            'fans_num': -1,
-            'followers_num': -1,
-            'original_num': -1,  # 记录可以获取的原创微博数
-            'repost_num': -1 , # 记录可以获取的转发微博数
+            'wb_num': 0,  # 记录博主曾发微博的总数，但可能由于某些原因不能够全部获取
+            'fans_num': 0,
+            'followers_num': 0,
+            'original_num': 0,  # 记录可以获取的原创微博数
+            'repost_num': 0,  # 记录可以获取的转发微博数
         }
         self.data.update(self.extra_data)  # 将所有信息都放在data字典中
         del self.extra_data
