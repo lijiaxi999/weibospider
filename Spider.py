@@ -61,8 +61,7 @@ class Spider(object):
     # 每访问 250 页 休息300秒
     # 每调用一次requests即调用一次_sleep函数
     def __sleep(self):
-        if self.count % 2 == 0:
-            sleep(1.5)
+        sleep(1.5)
         if self.count % 250 == 0:
             print("sleep 300.")
             sleep(300)
@@ -80,6 +79,8 @@ class Spider(object):
             try:
                 req = requests.get(url, headers=Spider.headers)
             except:
+                print('sleep for 100')
+                sleep(100)
                 cnt += 1
                 continue
             if req.status_code != requests.codes.ok:
@@ -91,8 +92,8 @@ class Spider(object):
     # 1.id
     @staticmethod
     def __parse_user_id(soup):
-        href = soup.xpath("//div[@class='u']//a/@href")[0]
-        guid = re.findall(Spider.pattern2, href)
+        href = soup.xpath("//div[@class='u']//a/@href")
+        guid = re.findall(Spider.pattern2, href[0])
         id = int(guid[0])
         return id
 
@@ -313,9 +314,6 @@ class Spider(object):
         if att == 'ctt':
             flag = False
 
-        # debug
-        # print(flag)
-
         # 是转发微博，需要额外的获取转发人name，转发人id，转发理由等3个信息
         if flag:
             # 获取转发者姓名和id
@@ -325,10 +323,10 @@ class Spider(object):
             # 以防转发的微博被删除无法正确得到信息
             # 或由于作者设置，你暂时没有这条微博的查看权限
             if re_user_url and re_user_url[0] != 'https://weibo.cn/':
-                re_user_url = re_user_url[0]
-                html = self.__get(re_user_url).content
-                soup = etree.HTML(html)
-                re_user_id = self.__parse_user_id(soup)
+                href = re_user_url[0]
+                # 获取该用户的str_id
+                left_pos = href.rfind('/')
+                re_user_id = href[left_pos + 1:]
             else:
                 re_user_name = "无法得知"
                 re_user_id = "?"
@@ -446,10 +444,12 @@ class Spider(object):
         return weibo
 
     # 获取粉丝信息
+    @catch_exception
     def get_fans_info(self, blogger, num):
         uid = blogger.data['id']
         fans_num = blogger.data['fans_num']
 
+        count = 0  # 用于控制爬取的粉丝数量
         if fans_num < 3000:
             url = "https://weibo.cn/%d/fans" % uid
             html = self.__get(url).content
@@ -459,7 +459,6 @@ class Spider(object):
             total_page = int(total_page)
 
             # 遍历粉丝列表的每一页
-            count = 0  # 用于控制爬取的粉丝数量
             for page in range(1, total_page + 1):
                 if page != 1:
                     url = "https://weibo.cn/%d/fans?page=%d" % (uid, page)
@@ -472,7 +471,8 @@ class Spider(object):
                     node = tr_node.xpath(".//a")[0]
                     href = node.attrib['href']
                     # 获取该用户的str_id
-                    str_id = href[17:]
+                    left_pos = href.rfind('/')
+                    str_id = href[left_pos + 1:]
                     fan = User(str_id)
                     # 注意有可能爬取到自己！！！ 因为页面不同，会出现Indexerror
                     try:
@@ -502,7 +502,6 @@ class Spider(object):
                 page_num = soup.xpath("//div[@class='pa'][last()]//input[@name='mp']/@value")[0]
                 page_num = int(page_num)
 
-                count = 0  # 记录已抓取的粉丝人数
                 page = 1  # 记录遍历的页面
                 while count < num and page <= page_num:
                     if page != 1:
@@ -529,7 +528,10 @@ class Spider(object):
                 if page < page_num:
                     break
 
+        print('=============共抓取%d位粉丝的信息。=================' % count)
+
     # 获取关注者信息
+    @catch_exception
     def get_followers_info(self, blogger, num):
         uid = blogger.data['id']
         count = 0
@@ -552,7 +554,8 @@ class Spider(object):
                 node = tr_node.xpath(".//a")[0]
                 href = node.attrib['href']
                 # 获取该用户的str_id
-                str_id = href[17:]
+                left_pos = href.rfind('/')
+                str_id = href[left_pos + 1:]
                 follower = User(str_id)
                 # 注意有可能爬取到自己！！！ 因为页面不同，会出现Indexerror
                 try:
@@ -565,16 +568,24 @@ class Spider(object):
             if count >= num:
                 break
 
+        print('=============共抓取%d位关注者的信息的信息。=================' % count)
+
     # 返回一个记录了信息的User对象
     # 获取用户信息
-    @catch_exception
     def get_user_info(self, user):
         info = {}  # 存放信息
 
-        # 首先访问用户首页
-        url = "https://weibo.cn/%s" % user.str_id
-        html = self.__get(url).content
-        soup = etree.HTML(html)
+        count = 3
+        while count != 0:
+            # 首先访问用户首页
+            url = "https://weibo.cn/%s" % user.str_id
+            html = self.__get(url).content
+            soup = etree.HTML(html)
+            # 新浪会不定时的返回错误页面
+            if soup.xpath("string(//head/title)") != '我的首页':
+                break
+            count = count - 1
+            print('!!!!!!')
 
         # 首先判断要爬取的是不是Blogger,以获取额外信息
         if isinstance(user, Blogger):
@@ -636,7 +647,11 @@ class Spider(object):
             if len(info) >= 3:
                 for i in range(0, len(info) - 2):
                     # 依次解析每个微博节点
-                    wb = self.__parse_weibo_node(info[i])
+                    # 注意，不定时新浪会返回错误网页！！！！！！需要再次访问
+                    try:
+                        wb = self.__parse_weibo_node(info[i])
+                    except IndexError:
+                        wb = self.__parse_weibo_node(info[i])
                     blogger.weibo.append(wb)
                     count = count + 1
                     if wb.flag:
