@@ -4,6 +4,7 @@
 >简单的新浪微博爬虫，纯python实现，未使用框架。
 
 >爬取一名用户在新浪微博上的全部信息，包括用户个人信息，发布的微博，用户关注者，用户粉丝。
+并将其存放在MongoDB中
 
 ## 输入
 1.需要用户手动获取登陆新浪微博的cookies 
@@ -19,6 +20,9 @@
 >![json1](./screen_shot/json1.PNG)
 >![json2](./screen_shot/json2.PNG)
 >![json3](./screen_shot/json3.PNG)
+
+增添新功能，可以将用户信息存放在MongoDB中
+>![mongodb](./screen_shot/mongodb.PNG)
 ## 数据段
 >**User的数据段，希望爬取的博主，及其关注者和粉丝**
 
