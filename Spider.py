@@ -10,6 +10,7 @@ import traceback
 import json
 import re
 import os
+from pymongo import MongoClient
 from entity.User import User, Blogger
 from entity.Weibo import Weibo
 from time import sleep
@@ -38,7 +39,6 @@ def catch_exception(func):
 
 class Spider(object):
     # 类变量headers
-    # 及时替换cookie值
     headers = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Encoding': 'gzip, deflate, sdch',
@@ -69,7 +69,6 @@ class Spider(object):
     # 包装requests类的get方法
     # 每调用一次便print url
     # 同时self.count++ 便于控制访问频率
-
     def __get(self, url, max_try=3):
         self.count += 1
         print(str(self.count) + ':' + url)
@@ -443,11 +442,77 @@ class Spider(object):
         weibo.wirte(info)
         return weibo
 
+    # 返回一个记录了信息的User对象
+    # 获取用户信息
+    def __get_user_info(self, user):
+        info = {}  # 存放信息
+
+        count = 3
+        while count != 0:
+            # 首先访问用户首页
+            url = "https://weibo.cn/%s" % user.str_id
+            html = self.__get(url).content
+            soup = etree.HTML(html)
+            # 新浪会不定时的返回错误页面
+            if soup.xpath("string(//head/title)") != '我的首页':
+                break
+            count = count - 1
+            print('!!!!!!')
+
+        # 获取一般用户需要记录的十一项信息
+        # 1.id 11.verify在用户首页获取，其余信息项均在用户info页面获取
+        info['id'] = self.__parse_user_id(soup)
+        info['verify'] = self.__parse_user_verify_type(soup)
+
+        # 访问用户info页面
+        url = "https://weibo.cn/%d/info" % info['id']
+        html = self.__get(url).content
+        soup = etree.HTML(html)
+
+        info['gender'] = self.__parse_user_gender(soup)
+        info['name'] = self.__parse_user_name(soup)
+        info['location'] = self.__parse_user_location(soup)
+        info['intro'] = self.__parse_user_intro(soup)
+        info['identity'] = self.__parse_user_identity(soup)
+        info['education'] = self.__parse_user_education(soup)
+        info['birthday'], info['age'] = self.__parse_user_age(soup)
+        info['labels'] = self.__parse_user_label(soup)
+
+        user.write_data(info)
+
+    # 获取博主信息
+    @catch_exception
+    def get_blogger_info(self, blogger):
+        # 访问主页
+        url = "https://weibo.cn/%s" % blogger.str_id
+        html = self.__get(url).content
+        soup = etree.HTML(html)
+
+        # 获取博主的各项信息
+        blogger_info = self.__parse_blogger_info(soup)
+        blogger.write_data(blogger_info)
+        self.__get_user_info(blogger)
+
+        # 在MongoDB写入博主信息
+        db_name = blogger.data['name']
+        coll_name = 'blogger'
+        data = [blogger.data]
+        self.store(db_name, coll_name, data)
+
     # 获取粉丝信息
     @catch_exception
     def get_fans_info(self, blogger, num):
         uid = blogger.data['id']
         fans_num = blogger.data['fans_num']
+        data = []
+
+        # 写入MongoDB
+        def store_fans():
+            db_name = blogger.data['name']
+            coll_name = 'fans'
+            print()
+            self.store(db_name, coll_name, data)
+            data.clear()
 
         count = 0  # 用于控制爬取的粉丝数量
         if fans_num < 3000:
@@ -458,6 +523,7 @@ class Spider(object):
             total_page = soup.xpath("//div[@class='c'][1]/div[@class='pa']//input[@name='mp']/@value")[0]
             total_page = int(total_page)
 
+            flag = False  # 何时跳出第二层循环
             # 遍历粉丝列表的每一页
             for page in range(1, total_page + 1):
                 if page != 1:
@@ -476,12 +542,20 @@ class Spider(object):
                     fan = User(str_id)
                     # 注意有可能爬取到自己！！！ 因为页面不同，会出现Indexerror
                     try:
-                        self.get_user_info(fan)
+                        self.__get_user_info(fan)
                     except IndexError:
                         continue
                     blogger.fans.append(fan)
+                    data.append(fan.data)
                     count += 1
-                if count >= num:
+                    if count % 50 == 0:
+                        store_fans()
+                    if count >= num:
+                        if count % 50 != 0:
+                            store_fans()
+                        flag = True
+                        break
+                if flag:
                     break
         # 从用户的微博中抓取 num个点赞的人数
         else:
@@ -493,6 +567,7 @@ class Spider(object):
             temp = soup.xpath("//div[@class='c']")
 
             # 遍历profile页面的所有微博，进入每条微博的点赞页面
+            flag = False
             for i in range(0, len(temp) - 2):
                 href = temp[i].xpath("div/a")[-1].attrib['href']
                 w_str = re.findall('/([^/]+)\?', href)[0]  # 抽取（/.....?)之间的微博id
@@ -518,14 +593,21 @@ class Spider(object):
                             followers_id.append(str_id)
                             # 获取每个关注者的基本信息页面
                             fan = User(str_id)
-                            self.get_user_info(fan)
+                            self.__get_user_info(fan)
                             blogger.fans.append(fan)
+                            data.append(fan.data)
                             count = count + 1
-
+                        if count % 50 == 0:
+                            store_fans()
+                        if count >= num:
+                            if count % 50 != 0:
+                                store_fans()
+                            flag = True
+                            break
                     # 遍历完某一页后，换到下一页
                     page = page + 1
-                # 仅一条微博就爬取100 fan
-                if page < page_num:
+                # 仅一条微博就爬取num个fan
+                if flag:
                     break
 
         print('=============共抓取%d位粉丝的信息。=================' % count)
@@ -535,6 +617,14 @@ class Spider(object):
     def get_followers_info(self, blogger, num):
         uid = blogger.data['id']
         count = 0
+        data = []
+
+        # 写入MongoDB
+        def store_followers():
+            db_name = blogger.data['name']
+            coll_name = 'followers'
+            self.store(db_name, coll_name, data)
+            data.clear()
 
         url = "https://weibo.cn/%d/follow?page=1" % uid
         html = self.__get(url).content
@@ -543,6 +633,7 @@ class Spider(object):
         page_num = int(temp.attrib['value'])
 
         # 开始遍历前n页
+        flag = False
         for i in range(1, page_num + 1):
             if i != 1:
                 url = "https://weibo.cn/%d/follow?page=%d" % (uid, i)
@@ -559,67 +650,36 @@ class Spider(object):
                 follower = User(str_id)
                 # 注意有可能爬取到自己！！！ 因为页面不同，会出现Indexerror
                 try:
-                    self.get_user_info(follower)
+                    self.__get_user_info(follower)
                 except IndexError:
                     continue
                 blogger.followers.append(follower)
+                data.append(follower.data)
                 count += 1
-
-            if count >= num:
+                if count % 50 == 0:
+                    store_followers()
+                if count >= num:
+                    if count % 50 != 0:
+                        store_followers()
+                    flag = True
+                    break
+            if flag:
                 break
 
         print('=============共抓取%d位关注者的信息的信息。=================' % count)
 
-    # 返回一个记录了信息的User对象
-    # 获取用户信息
-    def get_user_info(self, user):
-        info = {}  # 存放信息
-
-        count = 3
-        while count != 0:
-            # 首先访问用户首页
-            url = "https://weibo.cn/%s" % user.str_id
-            html = self.__get(url).content
-            soup = etree.HTML(html)
-            # 新浪会不定时的返回错误页面
-            if soup.xpath("string(//head/title)") != '我的首页':
-                break
-            count = count - 1
-            print('!!!!!!')
-
-        # 首先判断要爬取的是不是Blogger,以获取额外信息
-        if isinstance(user, Blogger):
-            blogger_info = self.__parse_blogger_info(soup)
-            info.update(blogger_info)
-            # for key,val in blogger_info.items():
-            #     print(key,val)
-
-        # 获取一般用户需要记录的十一项信息
-        # 1.id 11.verify在用户首页获取，其余信息项均在用户info页面获取
-        info['id'] = self.__parse_user_id(soup)
-        info['verify'] = self.__parse_user_verify_type(soup)
-
-        # 访问用户info页面
-        url = "https://weibo.cn/%d/info" % info['id']
-        html = self.__get(url).content
-        soup = etree.HTML(html)
-
-        info['gender'] = self.__parse_user_gender(soup)
-        info['name'] = self.__parse_user_name(soup)
-        info['location'] = self.__parse_user_location(soup)
-        info['intro'] = self.__parse_user_intro(soup)
-        info['identity'] = self.__parse_user_identity(soup)
-        info['education'] = self.__parse_user_education(soup)
-        info['birthday'], info['age'] = self.__parse_user_age(soup)
-        info['labels'] = self.__parse_user_label(soup)
-
-        user.write_data(info)
-
     # 获取Blogger的全部微博
     @catch_exception
     def get_weibo_info(self, blogger, num):
-        weibo = []
         uid = blogger.data['id']
+        data = []
+
+        # 写入MongoDB
+        def store_weibo():
+            db_name = blogger.data['name']
+            coll_name = 'weibo'
+            self.store(db_name, coll_name, data)
+            data.clear()
 
         # 首先访问用户首页
         url = "https://weibo.cn/u/%d?filter=0&page=1" % uid
@@ -653,13 +713,22 @@ class Spider(object):
                     except IndexError:
                         wb = self.__parse_weibo_node(info[i])
                     blogger.weibo.append(wb)
+                    # 数据放入一个字典内
+                    wb_data = wb.data
+                    wb_data['flag'] = wb.flag
+                    data.append(wb_data)
                     count = count + 1
+                    if count % 100 == 0:
+                        store_weibo()
                     if wb.flag:
                         blogger.data['repost_num'] += 1
                     else:
                         blogger.data['original_num'] += 1
             if count >= num:
+                if count % 50 != 0:
+                    store_weibo()
                 break
+
         # 成功
         print("该用户共发布" + str(blogger.data['wb_num']) + "条微博")
         print("共爬取" + str(blogger.data['original_num'] + blogger.data['repost_num']) + "条微博")
@@ -674,6 +743,14 @@ class Spider(object):
         print("==============fans information===============")
         for fan in blogger.fans:
             print(fan.__dict__)
+
+    @catch_exception
+    def store(self, db_name, coll_name, info):
+        client = MongoClient()
+        db = client[db_name]
+        collection = db[coll_name]
+        collection.insert_many(info)
+        print("写入<" + db_name + "." + coll_name + ">成功！")
 
     @catch_exception
     def write_json(self, blogger):
@@ -703,21 +780,21 @@ class Spider(object):
             num_followers = num_followers
         # 开始运行
         blogger = Blogger(uid)
-        self.get_user_info(blogger)
+        self.get_blogger_info(blogger)
         self.get_weibo_info(blogger, num_weibo)
         self.get_fans_info(blogger, num_fans)
         self.get_followers_info(blogger, num_followers)
         # self.show(blogger)
-        self.write_json(blogger)
+        # self.write_json(blogger)
 
 
 def main():
     try:
         # 使用实例,输入一个用户id，所有信息都会存储在Blogger实例中
-        uid = 'yeziyiyeziyi'  # 可以改成任意合法的用户id（爬虫的微博id除外）
+        uid = ''  # 可以改成任意合法的用户id（爬虫的微博id除外）
         spider = Spider(
             cookie="")
-        spider.start(uid, num_weibo=10, num_fans=10, num_followers=10)
+        spider.start(uid, num_weibo=5, num_fans=5, num_followers=5)
     except Exception as e:
         traceback.print_exc()
 
