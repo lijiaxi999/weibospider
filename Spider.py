@@ -373,30 +373,38 @@ class Spider(object):
             content = content[:-4]  # 注意微博信息后会有一个空格和三个无宽度字符
         info['content'] = content
 
-        # 3.获取发布时间
+        # 3.获取发布时间 , 获取发布设备信息
         str_time_node = node.xpath("div/span[@class='ct']")
         str_time = str_time_node[0].xpath("string(.)")
         publish_time = str_time.split('来自')[0]
+        try:
+            from_str = str_time.split('来自')[1]
+        except IndexError:
+            from_str = 'null'
+        info['from'] = from_str
         if '刚刚' in publish_time:
-            publish_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+            publish_time = datetime.now()
         elif '分钟' in publish_time:
             minute = publish_time[:publish_time.find(u"分钟")]
             minute = timedelta(minutes=int(minute))
-            publish_time = (datetime.now() - minute).strftime('%Y-%m-%d %H:%M')
+            publish_time = datetime.now() - minute
         elif "今天" in publish_time:
             today = datetime.now().strftime("%Y-%m-%d")
             time = publish_time[3:]
             publish_time = today + " " + time
+            publish_time = publish_time.strip('\xa0')  # !!!
+            publish_time = datetime.strptime(publish_time, "%Y-%m-%d %H:%M")
         elif "月" in publish_time:
             year = datetime.now().strftime("%Y")
             month = publish_time[0:2]
             day = publish_time[3:5]
             time = publish_time[7:12]
             publish_time = (year + "-" + month + "-" + day + " " + time)
+            publish_time = datetime.strptime(publish_time, "%Y-%m-%d %H:%M")
         else:
             publish_time = publish_time[:16]
+            publish_time = datetime.strptime(publish_time, "%Y-%m-%d %H:%M")
         info['publish_time'] = publish_time
-
         # 4.点赞数
         str_zan = node.xpath("((div/a)|(div/span[@class='cmt']))/text()")[-4]
         guid = re.findall(self.pattern1, str_zan, re.M)
@@ -600,7 +608,7 @@ class Spider(object):
                         if count % 50 == 0:
                             store_fans()
                         if count >= num:
-                            if count % 50 != 0:
+                            if data:
                                 store_fans()
                             flag = True
                             break
@@ -659,7 +667,7 @@ class Spider(object):
                 if count % 50 == 0:
                     store_followers()
                 if count >= num:
-                    if count % 50 != 0:
+                    if data:
                         store_followers()
                     flag = True
                     break
@@ -725,9 +733,9 @@ class Spider(object):
                     else:
                         blogger.data['original_num'] += 1
             if count >= num:
-                if count % 50 != 0:
-                    store_weibo()
                 break
+        if data:
+            store_weibo()
 
         # 成功
         print("该用户共发布" + str(blogger.data['wb_num']) + "条微博")
@@ -782,8 +790,8 @@ class Spider(object):
         blogger = Blogger(uid)
         self.get_blogger_info(blogger)
         self.get_weibo_info(blogger, num_weibo)
-        self.get_fans_info(blogger, num_fans)
-        self.get_followers_info(blogger, num_followers)
+        # self.get_fans_info(blogger, num_fans)
+        # self.get_followers_info(blogger, num_followers)
         # self.show(blogger)
         # self.write_json(blogger)
 

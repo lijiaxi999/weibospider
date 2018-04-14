@@ -22,6 +22,7 @@ class Weibo(object):
             'up_num': 0,
             'repost_num': 0,
             'comment_num': 0,
+            'from': '',
             'topics': [],
             'at_users': [],
             'type': []}
